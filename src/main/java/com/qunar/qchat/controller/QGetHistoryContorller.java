@@ -911,4 +911,13 @@ public class QGetHistoryContorller {
 
         resultMap.put("message",bodyMap);
     }
+
+
+    private String conversionAsc(String direction) {
+        if (direction.startsWith("<")) {
+            return "desc";
+        } else {
+            return "asc";
+        }
+    }
 }
