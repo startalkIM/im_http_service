@@ -1,4 +1,4 @@
-# im_http_service_open
+# im_http_service
 
 ## 概述
 提供包括用户信息、群信息、组织架构、消息发送以及订阅公众号相关的QTalk接口服务。
@@ -18,7 +18,7 @@ im_http_service_open
 - pom.xml
 
 ## 运行方式
-1. >git clone git@github.com:qunarcorp/im_http_service_open.git
+1. >git clone git@github.com:startalkIM/im_http_service.git
 2. >mvn package
 3. run on tomcat
 
