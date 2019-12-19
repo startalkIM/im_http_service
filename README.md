@@ -23,6 +23,6 @@ im_http_service_open
 3. run on tomcat
 
 
-## 接口说明
+## 接口文档
 
 [参考文档](doc/http_introduction.md)
