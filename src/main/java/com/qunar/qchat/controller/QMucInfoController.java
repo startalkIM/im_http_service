@@ -454,13 +454,13 @@ public class QMucInfoController {
      * @param request
      * @return JsonResult<?>
      */
-    @RequestMapping(value = "/get_user_muc_fb.qunar", method = RequestMethod.POST)
+    @RequestMapping(value = "/get_user_muc_fb.star", method = RequestMethod.POST)
     public JsonResult<?> getUserMucFb(@RequestBody GetUserMucFwRequest request) {
 
         if (!request.isRequestValid()) {
             return JsonResultUtils.fail(-1, "parameter error");
         }
-        String uid = request.getUserId();
+        String uid = request.getUserid();
         String userId = uid.split("@")[0];
         String domain = uid.split("@")[1];
         List<String> fwMucs = new ArrayList<>();

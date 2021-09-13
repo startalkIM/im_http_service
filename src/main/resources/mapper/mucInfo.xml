@@ -14,7 +14,7 @@
         <result property="version" column="version"></result>
     </resultMap>
 
-    <resultMap id="mucOptsInfoResultMap" type="com.qunar.chat.dao.model.MucOptsModel">
+    <resultMap id="mucOptsInfoResultMap" type="com.qunar.qchat.dao.model.MucOptsModel">
         <result property="mucName" column="muc"></result>
         <result property="opts" column="opts"></result>
     </resultMap>
