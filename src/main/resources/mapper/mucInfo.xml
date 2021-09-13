@@ -130,7 +130,7 @@
     </select>
 
     <select id="getMucOptsByUserId" resultMap="mucOptsInfoResultMap">
-        select a.name || '@' || a.host as muc, opts FROM muc_room a left join user_register_mucs ON
+        select a.name || '@' || a.host as muc, a.opts FROM muc_room a left join user_register_mucs b ON
         a.name = b.muc_name AND a.host = b.domain and b.username = #{userId} and b.host = #{userDomain};
     </select>
 </mapper>

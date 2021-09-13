@@ -581,7 +581,7 @@
 
     <build>
         <defaultGoal>package</defaultGoal>
-        <finalName>im_http_service_open</finalName>
+        <finalName>im_http_service</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>

@@ -454,28 +454,42 @@ public class QMucInfoController {
      * @param request
      * @return JsonResult<?>
      */
-    @RequestMapping(value = "/get_user_muc_fb.star", method = RequestMethod.POST)
-    public JsonResult<?> getUserMucFb(@RequestBody GetUserMucFwRequest request) {
+    @RequestMapping(value = "/get_user_muc_fw.qunar", method = RequestMethod.POST)
+    public JsonResult<?> getUserMucFw(@RequestBody GetUserMucFwRequest request) {
 
         if (!request.isRequestValid()) {
             return JsonResultUtils.fail(-1, "parameter error");
         }
         String uid = request.getUserid();
+        if (!uid.contains("@")) {
+            return JsonResultUtils.fail(-1, "parameter error");
+        }
         String userId = uid.split("@")[0];
         String domain = uid.split("@")[1];
         List<String> fwMucs = new ArrayList<>();
         List<MucOptsModel> mucNames = mucInfoService.getMucOptsByUserId(userId, domain);
         Pattern fwPattern = Pattern.compile(FWREG, Pattern.CASE_INSENSITIVE);
-
         for (MucOptsModel mo : mucNames) {
             String opt = mo.getOpt();
-            Matcher matcher = fwPattern.matcher(opt);
-            if (matcher.find()) {
-                if (matcher.group(1).equals("true")) {
-                    fwMucs.add(mo.getMucName());
+            if (opt.equals("")) {
+                continue;
+            } else {
+                Matcher matcher = fwPattern.matcher(opt);
+                if (matcher.find()) {
+                    if (matcher.group(1).equals("true")) {
+                        fwMucs.add(mo.getMucName());
+                    }
+                } else {
+                    LOGGER.warn("Cant find forbidden_words", opt);
                 }
             }
+
         }
+        LOGGER.info("Forbidden words groups for user {}, groups: {}", uid, fwMucs);
         return JsonResultUtils.success(fwMucs);
+
+
+
+
     }
 }
