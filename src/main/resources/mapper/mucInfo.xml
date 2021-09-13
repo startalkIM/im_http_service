@@ -14,6 +14,11 @@
         <result property="version" column="version"></result>
     </resultMap>
 
+    <resultMap id="mucOptsInfoResultMap" type="com.qunar.chat.dao.model.MucOptsModel">
+        <result property="mucName" column="muc"></result>
+        <result property="opts" column="opts"></result>
+    </resultMap>
+
     <sql id="column_all">
         muc_name, show_name, muc_desc, muc_title, muc_pic, version
     </sql>
@@ -124,4 +129,8 @@
 
     </select>
 
+    <select id="getMucOptsByUserId" resultMap="mucOptsInfoResultMap">
+        select a.name || '@' || a.host as muc, opts FROM muc_room a left join user_register_mucs ON
+        a.name = b.muc_name AND a.host = b.domain and b.username = #{userId} and b.host = #{userDomain};
+    </select>
 </mapper>

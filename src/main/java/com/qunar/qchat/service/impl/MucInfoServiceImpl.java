@@ -2,6 +2,7 @@ package com.qunar.qchat.service.impl;
 
 import com.qunar.qchat.dao.IMucInfoDao;
 import com.qunar.qchat.dao.model.MucInfoModel;
+import com.qunar.qchat.dao.model.MucOptsModel;
 import com.qunar.qchat.service.IMucInfoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,11 @@ public class MucInfoServiceImpl implements IMucInfoService {
     public List<String> getEjabHostMucIds(List<String> originMucIds, String suffix) {
         List<String> transferMucIds = originMucIds.stream().filter(muc -> muc.endsWith(suffix)).collect(Collectors.toList());
         return transferMucIds;
+    }
+
+    @Override
+    public List<MucOptsModel> getMucOptsByUserId(String userId, String domain) {
+        return iMucInfoDao.getMucOptsByUserId(userId, domain);
     }
 
 }
