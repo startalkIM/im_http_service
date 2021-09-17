@@ -45,4 +45,12 @@ public interface IMucInfoService {
     List<MucOptsModel> getMucOptsByUserId(String userId, String domain);
 
 
+    /**
+     * 根据userid和groupid查询群禁言状态,之后返回群id+群设置.
+     * @param userId 用户ID
+     * @return List<String>
+     * */
+    List<MucOptsModel> getMucOptsWithUserId(String userId, String domain, String mucId, String mucDomain);
+
+
 }

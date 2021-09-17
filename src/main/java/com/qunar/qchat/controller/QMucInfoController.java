@@ -7,11 +7,7 @@ import com.qunar.qchat.dao.model.MucIncrementInfo;
 import com.qunar.qchat.dao.model.MucInfoModel;
 import com.qunar.qchat.dao.model.MucOptsModel;
 import com.qunar.qchat.model.JsonResult;
-import com.qunar.qchat.model.request.GetIncrementMucsRequest;
-import com.qunar.qchat.model.request.GetMucVcardRequest;
-import com.qunar.qchat.model.request.GetUserIncrementMucVCardRequest;
-import com.qunar.qchat.model.request.UpdateMucNickRequest;
-import com.qunar.qchat.model.request.GetUserMucFwRequest;
+import com.qunar.qchat.model.request.*;
 import com.qunar.qchat.model.result.GetMucVcardResult;
 import com.qunar.qchat.model.result.UpdateMucNickResult;
 import com.qunar.qchat.service.IMucInfoService;
@@ -53,6 +49,8 @@ import java.util.regex.Pattern;
 public class QMucInfoController {
     private static final Logger LOGGER = LoggerFactory.getLogger(QMucInfoController.class);
     private static final String FWREG = "\\{forbidden_words,(.*?)\\}";
+    private static final String ADMINREG = "\\{affiliations,\\[(.*?)\\]\\}";
+    private static final String ADMINTEMPLATE = "<<\"%s\">>,<<\"%s\">>";
     @Autowired
     private IMucInfoDao iMucInfoDao;
 
@@ -460,7 +458,7 @@ public class QMucInfoController {
         if (!request.isRequestValid()) {
             return JsonResultUtils.fail(-1, "parameter error");
         }
-        String uid = request.getUserid();
+        String uid = request.getUserid().trim();
         if (!uid.contains("@")) {
             return JsonResultUtils.fail(-1, "parameter error");
         }
@@ -487,9 +485,57 @@ public class QMucInfoController {
         }
         LOGGER.info("Forbidden words groups for user {}, groups: {}", uid, fwMucs);
         return JsonResultUtils.success(fwMucs);
+    }
+    @RequestMapping(value = "/get_muc_fw.qunar", method = RequestMethod.POST)
+    public JsonResult<?> getMucFw(@RequestBody GetMucFwRequest request) {
 
+        if (!request.isRequestValid()) {
+            return JsonResultUtils.fail(-1, "parameter error");
+        }
+        String uid = request.getUserid().trim();
+        String groupid = request.getGroupid().trim();
+        if (!uid.contains("@") || !groupid.contains("@")) {
+            return JsonResultUtils.fail(-1, "parameter error");
+        }
+        String userId = uid.split("@")[0];
+        String domain = uid.split("@")[1];
+        String mucId = groupid.split("@")[0];
+        String mucDomain = groupid.split("@")[1];
+        List<MucOptsModel> mucNames = mucInfoService.getMucOptsWithUserId(userId, domain, mucId, mucDomain);
 
-
-
+        if(mucNames.size() != 1){
+            LOGGER.warn("Sql Error,  group found result not only {}", mucNames);
+            if(mucNames.size() == 0){
+                return JsonResultUtils.fail(-1, "user not in group");
+            }
+        }
+        MucOptsModel mucOpt = mucNames.get(0);
+        String mucName = mucOpt.getMucName();
+        String opt = mucOpt.getOpt();
+        boolean fwTag = false;
+        Pattern fwPattern = Pattern.compile(FWREG, Pattern.CASE_INSENSITIVE);
+        Matcher fwMatcher = fwPattern.matcher(opt);
+        if (fwMatcher.find()) {
+            if (fwMatcher.group(1).equals("true")) {
+                fwTag = true;
+            }
+        }else{
+            LOGGER.warn("Failed to find forbidden words for {} mucOpt {}", mucNames, mucOpt);
+        }
+        boolean adminTag = false;
+        Pattern adminPattern = Pattern.compile(ADMINREG, Pattern.CASE_INSENSITIVE);
+        Matcher adminMatcher = adminPattern.matcher(opt);
+        if (adminMatcher.find()) {
+            if (adminMatcher.group(1).contains(String.format(ADMINTEMPLATE, userId, domain))) {
+                adminTag = true;
+            }
+        }else{
+            LOGGER.warn("Failed to find admins for {} mucOpt {}", mucNames, mucOpt);
+        }
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("group_id",mucName);
+        resultMap.put("is_fw",fwTag);
+        resultMap.put("is_admin", adminTag);
+        return JsonResultUtils.success(resultMap);
     }
 }

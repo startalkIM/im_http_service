@@ -45,4 +45,9 @@ public class MucInfoServiceImpl implements IMucInfoService {
         return iMucInfoDao.getMucOptsByUserId(userId, domain);
     }
 
+    @Override
+    public List<MucOptsModel> getMucOptsWithUserId(String userId, String domain, String mucId, String mucDomain) {
+        return iMucInfoDao.getMucOptsWithUserId(userId, domain, mucId, mucDomain);
+    }
+
 }

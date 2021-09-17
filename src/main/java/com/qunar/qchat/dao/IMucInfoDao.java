@@ -45,4 +45,7 @@ public interface IMucInfoDao {
 
     List<MucOptsModel> getMucOptsByUserId(@Param("userId") String userName, @Param("userDomain") String domain);
 
+    List<MucOptsModel> getMucOptsWithUserId(@Param("userId") String userName, @Param("userDomain") String domain, @Param("mucId") String mucId, @Param("mucDomain") String mucDomain);
+
+
 }
