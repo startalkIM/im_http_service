@@ -5,11 +5,9 @@ import com.qunar.qchat.constants.QChatConstant;
 import com.qunar.qchat.dao.IMucInfoDao;
 import com.qunar.qchat.dao.model.MucIncrementInfo;
 import com.qunar.qchat.dao.model.MucInfoModel;
+import com.qunar.qchat.dao.model.MucOptsModel;
 import com.qunar.qchat.model.JsonResult;
-import com.qunar.qchat.model.request.GetIncrementMucsRequest;
-import com.qunar.qchat.model.request.GetMucVcardRequest;
-import com.qunar.qchat.model.request.GetUserIncrementMucVCardRequest;
-import com.qunar.qchat.model.request.UpdateMucNickRequest;
+import com.qunar.qchat.model.request.*;
 import com.qunar.qchat.model.result.GetMucVcardResult;
 import com.qunar.qchat.model.result.UpdateMucNickResult;
 import com.qunar.qchat.service.IMucInfoService;
@@ -42,11 +40,17 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+
 @RequestMapping("/newapi/muc/")
 @RestController
 public class QMucInfoController {
     private static final Logger LOGGER = LoggerFactory.getLogger(QMucInfoController.class);
-
+    private static final String FWREG = "\\{forbidden_words,(.*?)\\}";
+    private static final String ADMINREG = "\\{affiliations,\\[(.*?)\\]\\}";
+    private static final String ADMINTEMPLATE = "<<\"%s\">>,<<\"%s\">>";
     @Autowired
     private IMucInfoDao iMucInfoDao;
 
@@ -55,23 +59,24 @@ public class QMucInfoController {
 
     /**
      * 获取新增群列表.
-     * @param httpRequest HttpServletRequest
+     *
+     * @param httpRequest  HttpServletRequest
      * @param paramRequest GetIncrementMucsRequest
-     * @return  JsonResult<?>
-     * */
+     * @return JsonResult<?>
+     */
     @RequestMapping(value = "/get_increment_mucs.qunar", method = RequestMethod.POST)
     public Object getIncrement(HttpServletRequest httpRequest,
-                                      @RequestBody GetIncrementMucsRequest paramRequest) {
+                               @RequestBody GetIncrementMucsRequest paramRequest) {
         try {
-            if(Objects.isNull(paramRequest.getT())) {
+            if (Objects.isNull(paramRequest.getT())) {
                 return JsonResultUtils.fail(1, "参数错误");
             }
 
-            if(StringUtils.isBlank(paramRequest.getU())) {
+            if (StringUtils.isBlank(paramRequest.getU())) {
                 Map<String, Object> cookie = CookieUtils.getUserbyCookie(httpRequest);
                 paramRequest.setU(cookie.get("u").toString());
             }
-            if(StringUtils.isBlank(paramRequest.getD())) {
+            if (StringUtils.isBlank(paramRequest.getD())) {
                 Map<String, Object> cookie = CookieUtils.getUserbyCookie(httpRequest);
                 paramRequest.setD(cookie.get("d").toString());
             }
@@ -99,7 +104,7 @@ public class QMucInfoController {
             resultMap.put("ret", true);
             resultMap.put("errcode", 0);
             resultMap.put("errmsg", "");
-            if(CollectionUtils.isNotEmpty(mucIncrementInfoList)) {
+            if (CollectionUtils.isNotEmpty(mucIncrementInfoList)) {
                 resultMap.put("version", String.valueOf(mucIncrementInfoList.get(0).getCreated_at().getTime()));
             } else {
                 BigDecimal bigDecimal = new BigDecimal(paramRequest.getT());
@@ -117,19 +122,20 @@ public class QMucInfoController {
 
     /**
      * 设置群信息.
+     *
      * @param requests List<UpdateMucNickRequest>
      * @return JsonResult<?>
-     * */
+     */
     @RequestMapping(value = "/set_muc_vcard.qunar", method = RequestMethod.POST)
     public JsonResult<?> updateMucNick(@RequestBody List<UpdateMucNickRequest> requests) {
-        try{
+        try {
             // 校验参数
             if (CollectionUtils.isEmpty(requests)) {
                 return JsonResultUtils.fail(1, "参数错误");
             }
 
-            for(UpdateMucNickRequest request : requests) {
-                if(!request.isRequestValid()) {
+            for (UpdateMucNickRequest request : requests) {
+                if (!request.isRequestValid()) {
                     return JsonResultUtils.fail(1, "参数错误");
                 }
             }
@@ -139,7 +145,7 @@ public class QMucInfoController {
                      .map(request -> request.getMuc_name()).collect(Collectors.toList()));*/
 
             //fix bug
-            for(UpdateMucNickRequest request : requests) {
+            for (UpdateMucNickRequest request : requests) {
                 String tempMucName = "";
                 if (request.getMuc_name().indexOf("@") == -1) {
                     tempMucName = request.getMuc_name();
@@ -147,17 +153,17 @@ public class QMucInfoController {
                     tempMucName = request.getMuc_name().substring(0, request.getMuc_name().indexOf("@"));
                 }
                 int exitCount = iMucInfoDao.checkMucExist(tempMucName);
-                if(exitCount == 0) {
+                if (exitCount == 0) {
                     return JsonResultUtils.fail(1, "群" + request.getMuc_name() + "不存在");
                 }
             }
 
             List<UpdateMucNickResult> resultList = new ArrayList<>();
-            for(UpdateMucNickRequest request : requests) {
+            for (UpdateMucNickRequest request : requests) {
 
                 //判断群数据是否存在
                 Integer mucCount = iMucInfoDao.selectMucCountByMucName(request.getMuc_name());
-                if(mucCount == null || mucCount == 0){
+                if (mucCount == null || mucCount == 0) {
 
                     MucInfoModel mucInfoModel = new MucInfoModel();
                     mucInfoModel.setMucName(request.getMuc_name());
@@ -199,22 +205,22 @@ public class QMucInfoController {
                 LOGGER.info("发送群信息变更通知成功，群ID : {}", request.getMuc_name());
             }
             return JsonResultUtils.success(resultList);
-        }catch (Exception ex) {
+        } catch (Exception ex) {
             LOGGER.error("catch error: {}", ExceptionUtils.getStackTrace(ex));
             return JsonResultUtils.fail(0, "服务器操作异常");
         }
     }
 
 
-
     /**
      * 将群名称转成拼音（分词）.
+     *
      * @param showName
      * @return String
-     * */
+     */
     private String convertMucShowName2Pinyin(String showName) {
 
-        if(StringUtils.isEmpty(showName)) {
+        if (StringUtils.isEmpty(showName)) {
             return showName;
         }
 
@@ -231,7 +237,7 @@ public class QMucInfoController {
         StringBuilder pinyin = new StringBuilder();
         StringBuilder firstCharactorStr = new StringBuilder();
 
-        for(Term word : list) {
+        for (Term word : list) {
             try {
                 String wordName = word.getName();
                 String tempWordName = wordName;
@@ -242,16 +248,16 @@ public class QMucInfoController {
 
                 System.out.println(wordName);
 
-                if(isContainNumber(tempWordName) && !isChinese && !wordType.equals("en")) {
+                if (isContainNumber(tempWordName) && !isChinese && !wordType.equals("en")) {
                     char[] charArray = tempWordName.toCharArray();
                     for (int i = 0; i < charArray.length; i++) {
                         String n = charArray[i] + "";
                         if (QChatConstant.NUMBER_LIST.contains(n)) {
                             pinyin.append(n);
-                            if(i != charArray.length - 1) {
+                            if (i != charArray.length - 1) {
                                 try {
                                     wordName = tempWordName.substring(i + 1, tempWordName.length());
-                                }catch (Exception ex) {
+                                } catch (Exception ex) {
                                     LOGGER.error("ex: i = " + i + "," + wordName + ", " + ex.getMessage());
                                 }
                             }
@@ -262,7 +268,7 @@ public class QMucInfoController {
                     if (!org.springframework.util.StringUtils.isEmpty(wordName)) {
                         String tempPinYIn = PinyinHelper.toHanYuPinyinString(wordName, format, "", false);
                         pinyin.append(tempPinYIn);
-                        if(tempPinYIn.length() >= 1) {
+                        if (tempPinYIn.length() >= 1) {
                             firstCharactorStr.append(tempPinYIn.substring(0, 1));
                         }
                     }
@@ -291,7 +297,7 @@ public class QMucInfoController {
             }
         }
         String finalStr = pinyin + "|" + firstCharactorStr;
-        if(finalStr.length() > 1000) {
+        if (finalStr.length() > 1000) {
             return finalStr.substring(0, 1000);
         }
         return finalStr;
@@ -300,9 +306,9 @@ public class QMucInfoController {
 
     public static boolean isContainNumber(String str) {
         char[] chars = str.toCharArray();
-        for(char c : chars) {
+        for (char c : chars) {
             String n = c + "";
-            if(QChatConstant.NUMBER_LIST.contains(n)) {
+            if (QChatConstant.NUMBER_LIST.contains(n)) {
                 return true;
             }
         }
@@ -317,7 +323,7 @@ public class QMucInfoController {
         for (char c : cs) {
             String cStr = c + "";
             String pinyin = PinyinHelper.toHanYuPinyinString(cStr, format, "", false);
-            if(!org.springframework.util.StringUtils.isEmpty(pinyin)) {
+            if (!org.springframework.util.StringUtils.isEmpty(pinyin)) {
                 firstStr.append(pinyin.substring(0, 1));
             }
         }
@@ -327,12 +333,13 @@ public class QMucInfoController {
 
     /**
      * 获取群信息.
+     *
      * @param request List<GetMucVcardRequest>
-     * @return  JsonResult<?>
-     * */
+     * @return JsonResult<?>
+     */
     @RequestMapping(value = "/get_muc_vcard.qunar", method = RequestMethod.POST)
     public JsonResult<?> getMucVCard(@RequestBody List<GetMucVcardRequest> request) {
-        try{
+        try {
             //LOGGER.info(request.toString());
 
             //检查参数是否合法
@@ -341,48 +348,48 @@ public class QMucInfoController {
             }
 
             List<GetMucVcardResult> results =
-            request.stream().map(item -> {
-                List<GetMucVcardRequest.MucInfo> mucInfos = item.getMucs();
-                GetMucVcardResult result = new GetMucVcardResult();
-                result.setDomain(item.getDomain());
-                if(CollectionUtils.isNotEmpty(mucInfos)){
-                    List<String> mucIds = mucInfos.stream().
-                            map(requestMucInfo -> requestMucInfo.getMuc_name()).collect(Collectors.toList());
+                    request.stream().map(item -> {
+                        List<GetMucVcardRequest.MucInfo> mucInfos = item.getMucs();
+                        GetMucVcardResult result = new GetMucVcardResult();
+                        result.setDomain(item.getDomain());
+                        if (CollectionUtils.isNotEmpty(mucInfos)) {
+                            List<String> mucIds = mucInfos.stream().
+                                    map(requestMucInfo -> requestMucInfo.getMuc_name()).collect(Collectors.toList());
 
-                    List<MucInfoModel> mucInfoModels = iMucInfoDao.selectMucInfoByIds(mucIds);
-                    List<GetMucVcardResult.MucInfo> mucInfoResultList =
-                            mucInfoModels.stream().map(mucInfoModel -> {
-                                GetMucVcardResult.MucInfo resultMucInfo = new GetMucVcardResult.MucInfo();
-                                resultMucInfo.setMN(StringUtils.defaultString(mucInfoModel.getMucName(), ""));
-                                resultMucInfo.setSN(StringUtils.defaultString(mucInfoModel.getShowName(), ""));
-                                resultMucInfo.setMD(StringUtils.defaultString(mucInfoModel.getMucDesc(), ""));
-                                resultMucInfo.setMT(StringUtils.defaultString(mucInfoModel.getMucTitle(), ""));
-                                resultMucInfo.setMP(StringUtils.defaultString(mucInfoModel.getMucPic(), ""));
-                                resultMucInfo.setVS(StringUtils.defaultString(mucInfoModel.getVersion(), ""));
-                                return resultMucInfo;
-                            }).collect(Collectors.toList());
-                    result.setMucs(mucInfoResultList);
-                }else {
-                    result.setMucs(new ArrayList<>());
-                }
+                            List<MucInfoModel> mucInfoModels = iMucInfoDao.selectMucInfoByIds(mucIds);
+                            List<GetMucVcardResult.MucInfo> mucInfoResultList =
+                                    mucInfoModels.stream().map(mucInfoModel -> {
+                                        GetMucVcardResult.MucInfo resultMucInfo = new GetMucVcardResult.MucInfo();
+                                        resultMucInfo.setMN(StringUtils.defaultString(mucInfoModel.getMucName(), ""));
+                                        resultMucInfo.setSN(StringUtils.defaultString(mucInfoModel.getShowName(), ""));
+                                        resultMucInfo.setMD(StringUtils.defaultString(mucInfoModel.getMucDesc(), ""));
+                                        resultMucInfo.setMT(StringUtils.defaultString(mucInfoModel.getMucTitle(), ""));
+                                        resultMucInfo.setMP(StringUtils.defaultString(mucInfoModel.getMucPic(), ""));
+                                        resultMucInfo.setVS(StringUtils.defaultString(mucInfoModel.getVersion(), ""));
+                                        return resultMucInfo;
+                                    }).collect(Collectors.toList());
+                            result.setMucs(mucInfoResultList);
+                        } else {
+                            result.setMucs(new ArrayList<>());
+                        }
 
-                return result;
-            }).collect(Collectors.toList());
+                        return result;
+                    }).collect(Collectors.toList());
 
             return JsonResultUtils.success(results);
-        }catch (Exception ex) {
+        } catch (Exception ex) {
             LOGGER.error("catch error : {} ", ExceptionUtils.getStackTrace(ex));
             return JsonResultUtils.fail(0, "服务器操作异常");
         }
     }
 
-    private boolean checkGetMucVCardInfoParams(List<GetMucVcardRequest> request){
+    private boolean checkGetMucVCardInfoParams(List<GetMucVcardRequest> request) {
         if (CollectionUtils.isEmpty(request)) {
             return false;
         }
-        for(GetMucVcardRequest item : request) {
+        for (GetMucVcardRequest item : request) {
             List<GetMucVcardRequest.MucInfo> mucInfos = item.getMucs();
-            for(GetMucVcardRequest.MucInfo info : mucInfos) {
+            for (GetMucVcardRequest.MucInfo info : mucInfos) {
                 if (StringUtils.isBlank(info.getMuc_name())) {
                     //return JsonResultUtils.fail(0, "参数错误");
                     return false;
@@ -395,13 +402,14 @@ public class QMucInfoController {
 
     /**
      * 增量获取指定用户对应的群名片.
+     *
      * @param request
      * @return JsonResult<?>
-     * */
+     */
     @RequestMapping(value = "/get_user_increment_muc_vcard.qunar", method = RequestMethod.POST)
     public JsonResult<?> getUserIncrementMucVCard(@RequestBody GetUserIncrementMucVCardRequest request) {
 
-        if(!request.isRequestValid()) {
+        if (!request.isRequestValid()) {
             return JsonResultUtils.fail(-1, "parameter error");
         }
 
@@ -435,5 +443,99 @@ public class QMucInfoController {
                 }).collect(Collectors.toList());
 
         return mucInfoResultList;
+    }
+
+
+    /**
+     * 获取指定用户的群forbidden字段.
+     *
+     * @param request
+     * @return JsonResult<?>
+     */
+    @RequestMapping(value = "/get_user_muc_fw.qunar", method = RequestMethod.POST)
+    public JsonResult<?> getUserMucFw(@RequestBody GetUserMucFwRequest request) {
+
+        if (!request.isRequestValid()) {
+            return JsonResultUtils.fail(-1, "parameter error");
+        }
+        String uid = request.getUserid().trim();
+        if (!uid.contains("@")) {
+            return JsonResultUtils.fail(-1, "parameter error");
+        }
+        String userId = uid.split("@")[0];
+        String domain = uid.split("@")[1];
+        List<String> fwMucs = new ArrayList<>();
+        List<MucOptsModel> mucNames = mucInfoService.getMucOptsByUserId(userId, domain);
+        Pattern fwPattern = Pattern.compile(FWREG, Pattern.CASE_INSENSITIVE);
+        for (MucOptsModel mo : mucNames) {
+            String opt = mo.getOpt();
+            if (opt.equals("")) {
+                continue;
+            } else {
+                Matcher matcher = fwPattern.matcher(opt);
+                if (matcher.find()) {
+                    if (matcher.group(1).equals("true")) {
+                        fwMucs.add(mo.getMucName());
+                    }
+                } else {
+                    LOGGER.warn("Cant find forbidden_words", opt);
+                }
+            }
+
+        }
+        LOGGER.info("Forbidden words groups for user {}, groups: {}", uid, fwMucs);
+        return JsonResultUtils.success(fwMucs);
+    }
+    @RequestMapping(value = "/get_muc_fw.qunar", method = RequestMethod.POST)
+    public JsonResult<?> getMucFw(@RequestBody GetMucFwRequest request) {
+
+        if (!request.isRequestValid()) {
+            return JsonResultUtils.fail(-1, "parameter error");
+        }
+        String uid = request.getUserid().trim();
+        String groupid = request.getGroupid().trim();
+        if (!uid.contains("@") || !groupid.contains("@")) {
+            return JsonResultUtils.fail(-1, "parameter error");
+        }
+        String userId = uid.split("@")[0];
+        String domain = uid.split("@")[1];
+        String mucId = groupid.split("@")[0];
+        String mucDomain = groupid.split("@")[1];
+        List<MucOptsModel> mucNames = mucInfoService.getMucOptsWithUserId(userId, domain, mucId, mucDomain);
+
+        if(mucNames.size() != 1){
+            LOGGER.warn("Sql Error,  group found result not only {}", mucNames);
+            if(mucNames.size() == 0){
+                return JsonResultUtils.fail(-1, "user not in group");
+            }
+        }
+        MucOptsModel mucOpt = mucNames.get(0);
+        String mucName = mucOpt.getMucName();
+        String opt = mucOpt.getOpt();
+        boolean fwTag = false;
+        Pattern fwPattern = Pattern.compile(FWREG, Pattern.CASE_INSENSITIVE);
+        Matcher fwMatcher = fwPattern.matcher(opt);
+        if (fwMatcher.find()) {
+            if (fwMatcher.group(1).equals("true")) {
+                fwTag = true;
+            }
+        }else{
+            LOGGER.warn("Failed to find forbidden words for {} mucOpt {}", mucNames, mucOpt);
+        }
+        boolean adminTag = false;
+        Pattern adminPattern = Pattern.compile(ADMINREG, Pattern.CASE_INSENSITIVE);
+        Matcher adminMatcher = adminPattern.matcher(opt);
+        if (adminMatcher.find()) {
+            if (adminMatcher.group(1).contains(String.format(ADMINTEMPLATE, userId, domain))) {
+                adminTag = true;
+            }
+        }else{
+            LOGGER.warn("Failed to find admins for {} mucOpt {}", mucNames, mucOpt);
+        }
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("group_id",mucName);
+        resultMap.put("is_fw",fwTag);
+        resultMap.put("is_admin", adminTag);
+        return JsonResultUtils.success(resultMap);
     }
 }

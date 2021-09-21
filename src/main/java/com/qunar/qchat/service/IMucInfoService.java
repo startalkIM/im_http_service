@@ -1,6 +1,7 @@
 package com.qunar.qchat.service;
 
 import com.qunar.qchat.dao.model.MucInfoModel;
+import com.qunar.qchat.dao.model.MucOptsModel;
 
 import java.util.Date;
 import java.util.List;
@@ -35,6 +36,21 @@ public interface IMucInfoService {
      * @return List<String>
      * */
     List<String> getEjabHostMucIds(List<String> originMucIds, String host);
+
+    /**
+     * 根据userid查询所属群ID列表,之后返回群信息.
+     * @param userId 用户ID
+     * @return List<String>
+     * */
+    List<MucOptsModel> getMucOptsByUserId(String userId, String domain);
+
+
+    /**
+     * 根据userid和groupid查询群禁言状态,之后返回群id+群设置.
+     * @param userId 用户ID
+     * @return List<String>
+     * */
+    List<MucOptsModel> getMucOptsWithUserId(String userId, String domain, String mucId, String mucDomain);
 
 
 }
